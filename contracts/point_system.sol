@@ -42,7 +42,7 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
   function addItem(string calldata _productName, uint _price, uint _stock) external exiCheck(msg.sender){
     uint productId = products.push(product(_productName,_stock,_price,0,now*114514)) - 1; //乱数の精製方法を変えるかも
     for(uint i=0; i<sellers.length; i++){      //プロダクトとセラーの結びつけをしている
-      if(sellers[i].sellerAddress == msg.sender){  
+     if(sellers[i].sellerAddress == msg.sender){  
         productToSeller[productId] = i;
       }
     }
@@ -51,15 +51,16 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
     addressToBuyerInformation[msg.sender].cart_contents.push(_productId);
     for(uint i=0; i<addressToBuyerInformation[msg.sender].cart_contents.length; i++){
       if(addressToBuyerInformation[msg.sender].cart_contents[i] == _productId){     //
-        addressToBuyerInformation[msg.sender][i].items = _items;
+        addressToBuyerInformation[msg.sender].items[i] = _items;
       }
     }
     addressToBuyerInformation[msg.sender].cart_price += products[_productId].price* _items;
   }
   function cartView() external view returns(string[] memory){
-      string[] memory show = new string[](100);
-      for(uint i=0; i<addressToBuyerInformation[msg.sender].cart_contents.length; i++){
-        show.push(products[i].name);
+      uint length = addressToBuyerInformation[msg.sender].cart_contents.length;
+      string[] memory show = new string[](length);
+      for(uint i=0; i<length; i++){
+        show[i] = (products[addressToBuyerInformation[msg.sender].cart_contents[i]].name);
       }
       return show;
   }
@@ -77,7 +78,7 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
     uint cart_price = addressToBuyerInformation[msg.sender].cart_price;
     require(cart_price<=msg.value);
     sub(msg.sender);
-    addPoint(cart_price);
+    addPoint(cart_price,msg.sender);
     addProcessed(msg.sender);
     addressToBuyerInformation[msg.sender].cart_price = 0;
     return true;
@@ -87,32 +88,26 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
       return addressToBuyerInformation[msg.sender].cart_price;
   }
   function addProcessed(address buyer_address) private returns(uint){
-     for(uint m=0; m<cart_contents[buyer_address].length; m++){
+     for(uint m=0; m<addressToBuyerInformation[buyer_address].cart_contents.length; m++){
       for(uint i=0; i<products.length; i++){
-        if(i == cart_contents[buyer_address][m]){
-        sellers[productToSeller[i]].processed += products[cart_contents[buyer_address][m]].items * products[i].price;
+        if(i == addressToBuyerInformation[buyer_address].cart_contents[m]){
+        sellers[productToSeller[i]].processed += addressToBuyerInformation[buyer_address].items[m] * products[i].price;
       }
      }
     }
    }
-  function sub(address buyer) private{ //バグが起きているため修正　二個目以降の在庫数がきちんと引かれない
-    for(uint i=0; i<cart_contents[buyer].length; i++){
-      uint b = cart_contents[buyer][i].items;
-      cart_contents[buyer][i].stock -= b;
-      for(uint m=0; i<products.length; i++){
-      if(products[m].conNo == cart_contents[buyer][i].conNo){
-        products[m].stock -= b;
-      }
+  function sub(address buyerAddress) private{
+    for(uint i=0; i<addressToBuyerInformation[buyerAddress].cart_contents.length; i++){
+      products[addressToBuyerInformation[buyerAddress].cart_contents[i]].stock -= addressToBuyerInformation[buyerAddress].items[i];
     }
-   }
   }
-  function addPoint(uint _totalValue) private{
-    buyerToPoint[msg.sender] += _totalValue*rateOfReduction;
+  function addPoint(uint _totalValue, address _buyer_address) private{
+    addressToBuyerInformation[_buyer_address].point += _totalValue*rateOfReduction;
   }
   function usepoint(uint _amount) external{
-    require(buyerToPoint[msg.sender]>=_amount);
-    cart_price[msg.sender] -= _amount;
-    buyerToPoint[msg.sender] -= _amount;
+    require(addressToBuyerInformation[msg.sender].point>=_amount);
+    addressToBuyerInformation[msg.sender].cart_price -= _amount;
+    addressToBuyerInformation[msg.sender].point -= _amount;
   }
 
   modifier enoughStock(uint _productId,uint _items){

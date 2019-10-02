@@ -1,5 +1,5 @@
-const Migrations = artifacts.require("Migrations");
-
+var point_system = artifacts.require("point_system");
 module.exports = function(deployer) {
-  deployer.deploy(Migrations);
+  // Use deployer to state migration tasks.
+  deployer.deploy(point_system);
 };
