@@ -1,5 +1,6 @@
 pragma solidity ^0.5.0;
 pragma experimental ABIEncoderV2;
+import "/home/miraidai/point_system/node_modules/zeppelin-solidity/contracts/ownership/Ownable.sol";
 contract point_system {
 
 struct product{
@@ -7,7 +8,6 @@ struct product{
   uint stock;
   uint price;
   uint items;
-  uint conNo;
 }
 struct seller{
   string name;
@@ -20,27 +20,23 @@ struct buyer{
   uint point;
   uint cart_price;
   uint[] cart_contents;
+  uint[] inProcessing;
   uint[] items;
 }
 mapping(uint=>uint) productToSeller;
-mapping(address=>uint) veriousTypes;
 mapping(address=>buyer) addressToBuyerInformation;
-//mapping(address=>uint) buyerToPoint;
-//mapping(address=>product[]) cart_contents;
-//mapping(address=>uint[]) cart_contents ;
-//mapping(address=>uint) cart_price;
 product[] public products;
 seller[] public sellers;
 uint rateOfReduction = 20;
 
-function setRateOfReduction(uint newRateOfReduction) public {
+function setRateOfReduction(uint newRateOfReduction) public Ownable()  {
   rateOfReduction = newRateOfReduction;
 }
 function addSeller(string calldata name) external dupCheck(msg.sender){
   sellers.push(seller(name,msg.sender,0,0,0));
 }
   function addItem(string calldata _productName, uint _price, uint _stock) external exiCheck(msg.sender){
-    uint productId = products.push(product(_productName,_stock,_price,0,now*114514)) - 1; //乱数の精製方法を変えるかも
+    uint productId = products.push(product(_productName,_stock,_price,0)) - 1; //乱数の精製方法を変えるかも
     for(uint i=0; i<sellers.length; i++){      //プロダクトとセラーの結びつけをしている
      if(sellers[i].sellerAddress == msg.sender){  
         productToSeller[productId] = i;
@@ -64,16 +60,6 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
       }
       return show;
   }
-    /*uint count = 0;
-    for(uint i=veriousTypes[msg.sender]; i<cart_contents[msg.sender].length; i++){
-      show[count] = cart_contents[msg.sender][i];
-      count++;
-    }
-    product[] memory finishedShow = new product[](count);
-    for(uint i=0; i<count; i++){
-      finishedShow[i] = show[i];
-    }
-    return finishedShow;*/
   function acceptPayment() external payable returns(bool){
     uint cart_price = addressToBuyerInformation[msg.sender].cart_price;
     require(cart_price<=msg.value);
@@ -81,8 +67,11 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
     addPoint(cart_price,msg.sender);
     addProcessed(msg.sender);
     addressToBuyerInformation[msg.sender].cart_price = 0;
+    for(uint i=0; i<addressToBuyerInformation[sender].cart_contents.length; i++){
+      addressToBuyerInfromation[msg.sender].cart_contents[i] = addressToBuyerInformation[msg.sender].inProcessing[i];
+      delete addressToBuyerInformation[msg.sender].cart_contents[i];
+    }
     return true;
-    //veriousTypes[msg.sender] = cart_contents[msg.sender].length;
   }
   function getCartPrice() public view returns(uint){
       return addressToBuyerInformation[msg.sender].cart_price;
