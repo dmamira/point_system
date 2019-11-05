@@ -9,7 +9,8 @@ contract transfer_system is point_system{
       }else if(evaluation == 2){
           sellers[productToSeller[contentsNumber]].bad++;
       }
-      uint transferValue = products[addressToBuyerInformation[sender].inProcessing[iForReference]].price * addressToBuyerInformation[sender].items[iForReference];
+      uint transferValue = products[addressToBuyerInformation[sender].inProcessing[iForReference]].price * addressToBuyerInformation[sender].items[iForReference]*(100-Fee);
+      sellers[productToSeller[contentsNumber]].transfer(transferValue);
       delete addressToBuyerInformation[sender].inProcessing[iForReference]; //カートコンテンツを消すことでEtherが返還される。
       delete iForReference;  
   }

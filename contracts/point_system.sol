@@ -1,6 +1,6 @@
 pragma solidity ^0.5.0;
 pragma experimental ABIEncoderV2;
-import "/home/miraidai/point_system/node_modules/zeppelin-solidity/contracts/ownership/Ownable.sol";
+//import "/home/miraidai/point_system/node_modules/zeppelin-solidity/contracts/ownership/Ownable.sol";
 contract point_system {
 
 struct product{
@@ -27,10 +27,14 @@ mapping(uint=>uint) productToSeller;
 mapping(address=>buyer) addressToBuyerInformation;
 product[] public products;
 seller[] public sellers;
-uint rateOfReduction = 20;
+uint rateOfReduction = 10;
+uint Fee = 1;
 
-function setRateOfReduction(uint newRateOfReduction) public Ownable()  {
+function setRateOfReduction(uint newRateOfReduction) public {
   rateOfReduction = newRateOfReduction;
+}
+function setFee(uint newFee) public{
+  Fee = newFee;
 }
 function addSeller(string calldata name) external dupCheck(msg.sender){
   sellers.push(seller(name,msg.sender,0,0,0));
@@ -45,13 +49,10 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
   }
   function AddToCart(uint _productId,uint _items) external enoughStock(_productId,_items){
     addressToBuyerInformation[msg.sender].cart_contents.push(_productId);
-    for(uint i=0; i<addressToBuyerInformation[msg.sender].cart_contents.length; i++){
-      if(addressToBuyerInformation[msg.sender].cart_contents[i] == _productId){     //
-        addressToBuyerInformation[msg.sender].items[i] = _items;
-      }
-    }
+    addressToBuyerInformation[msg.sender].items.push(_items);
     addressToBuyerInformation[msg.sender].cart_price += products[_productId].price* _items;
   }
+  
   function cartView() external view returns(string[] memory){
       uint length = addressToBuyerInformation[msg.sender].cart_contents.length;
       string[] memory show = new string[](length);
@@ -65,10 +66,9 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
     require(cart_price<=msg.value);
     sub(msg.sender);
     addPoint(cart_price,msg.sender);
-    addProcessed(msg.sender);
     addressToBuyerInformation[msg.sender].cart_price = 0;
-    for(uint i=0; i<addressToBuyerInformation[sender].cart_contents.length; i++){
-      addressToBuyerInfromation[msg.sender].cart_contents[i] = addressToBuyerInformation[msg.sender].inProcessing[i];
+    for(uint i=0; i<addressToBuyerInformation[msg.sender].cart_contents.length; i++){
+      addressToBuyerInformation[msg.sender].cart_contents[i] = addressToBuyerInformation[msg.sender].inProcessing[i];
       delete addressToBuyerInformation[msg.sender].cart_contents[i];
     }
     return true;
@@ -109,10 +109,11 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
       if(sellers[uint(i)].sellerAddress == seller1){
         check =  -1;
       }
-    }
+    } 
     require(check!=-1);
     _;
   }
+
 modifier exiCheck(address seller2){
     int check2 = -1;
     for(int i=0; i<int(sellers.length); i++){
