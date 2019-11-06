@@ -1,6 +1,6 @@
 pragma solidity ^0.5.0;
 pragma experimental ABIEncoderV2;
-//import "/home/miraidai/point_system/node_modules/zeppelin-solidity/contracts/ownership/Ownable.sol";
+import "/home/miraidai/point_system/node_modules/zeppelin-solidity/contracts/ownership/Ownable.sol";
 contract point_system {
 
 struct product{
@@ -11,12 +11,12 @@ struct product{
 }
 struct seller{
   string name;
-  address sellerAddress;
+  address payable sellerAddress;
   uint good;
   uint bad;
   uint processed;
 }
-struct buyer{ 
+struct buyer{
   uint point;
   uint cart_price;
   uint[] cart_contents;
@@ -25,24 +25,29 @@ struct buyer{
 }
 mapping(uint=>uint) productToSeller;
 mapping(address=>buyer) addressToBuyerInformation;
+address[] public PermissionPersonList;
 product[] public products;
 seller[] public sellers;
 uint rateOfReduction = 10;
 uint Fee = 1;
 
-function setRateOfReduction(uint newRateOfReduction) public {
+function setRateOfReduction(uint newRateOfReduction) public Ownable() {
   rateOfReduction = newRateOfReduction;
 }
-function setFee(uint newFee) public{
+function AddPermissionAddress(address pemissionPerson) public Ownable(){
+  PermissionPersonList.push(permissionPerson);
+}
+function setFee(uint newFee) public Ownable(){
   Fee = newFee;
 }
 function addSeller(string calldata name) external dupCheck(msg.sender){
+  
   sellers.push(seller(name,msg.sender,0,0,0));
 }
   function addItem(string calldata _productName, uint _price, uint _stock) external exiCheck(msg.sender){
     uint productId = products.push(product(_productName,_stock,_price,0)) - 1; //乱数の精製方法を変えるかも
-    for(uint i=0; i<sellers.length; i++){      //プロダクトとセラーの結びつけをしている
-     if(sellers[i].sellerAddress == msg.sender){  
+    for(uint i=0; i<sellers.length; i++){ //プロダクトとセラーの結びつけをしている
+     if(sellers[i].sellerAddress == msg.sender){
         productToSeller[productId] = i;
       }
     }
@@ -52,7 +57,6 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
     addressToBuyerInformation[msg.sender].items.push(_items);
     addressToBuyerInformation[msg.sender].cart_price += products[_productId].price* _items;
   }
-  
   function cartView() external view returns(string[] memory){
       uint length = addressToBuyerInformation[msg.sender].cart_contents.length;
       string[] memory show = new string[](length);
@@ -67,7 +71,7 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
     sub(msg.sender);
     addPoint(cart_price,msg.sender);
     addressToBuyerInformation[msg.sender].cart_price = 0;
-    for(uint i=0; i<addressToBuyerInformation[msg.sender].cart_contents.length; i++){
+    for(uint i=0; i<addressToBuyerInformation[msg.sender].cart_contents.length; i++){ 
       addressToBuyerInformation[msg.sender].cart_contents[i] = addressToBuyerInformation[msg.sender].inProcessing[i];
       delete addressToBuyerInformation[msg.sender].cart_contents[i];
     }
@@ -77,8 +81,8 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
       return addressToBuyerInformation[msg.sender].cart_price;
   }
   function addProcessed(address buyer_address) private returns(uint){
-     for(uint m=0; m<addressToBuyerInformation[buyer_address].cart_contents.length; m++){
-      for(uint i=0; i<products.length; i++){
+     for(uint m=0; m<addressToBuyerInformation[buyer_address].cart_contents.length; m++){ 
+      for(uint i=0; i<products.length; i++){ 
         if(i == addressToBuyerInformation[buyer_address].cart_contents[m]){
         sellers[productToSeller[i]].processed += addressToBuyerInformation[buyer_address].items[m] * products[i].price;
       }
@@ -86,7 +90,7 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
     }
    }
   function sub(address buyerAddress) private{
-    for(uint i=0; i<addressToBuyerInformation[buyerAddress].cart_contents.length; i++){
+    for(uint i=0; i<addressToBuyerInformation[buyerAddress].cart_contents.length; i++){ 
       products[addressToBuyerInformation[buyerAddress].cart_contents[i]].stock -= addressToBuyerInformation[buyerAddress].items[i];
     }
   }
@@ -124,4 +128,15 @@ modifier exiCheck(address seller2){
     require(check2!=-1);
     _;
   }
+ modifier PermissionCheck(address person){
+   uint check = false;
+   for(uint i = 0; i<PermissionPersonList.length; i++ ){
+     if(PermissionPersonList[i] == person){
+       check = true;
+       break;
+     }
+   }
+   require(check==true,"You aren't in the permission list ");
+   _;
  }
+}
