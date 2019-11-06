@@ -1,6 +1,13 @@
 pragma solidity ^0.5.0;
 pragma experimental ABIEncoderV2;
 import "/home/miraidai/point_system/node_modules/zeppelin-solidity/contracts/ownership/Ownable.sol";
+
+contract ERC20CoinInterface{
+  function transfer(address _to, uint256 _value) public returns (bool);
+  function approve(address spender, uint tokens) public returns (bool success);
+  function transferFrom(address from, address to, uint tokens) public returns (bool success);
+}
+
 contract point_system {
 
 struct product{
@@ -30,6 +37,10 @@ product[] public products;
 seller[] public sellers;
 uint rateOfReduction = 10;
 uint Fee = 1;
+address ALISTokenAddress = 0xea610b1153477720748dc13ed378003941d84fab;
+address ARUKTokenAddress = 0x81aada684f4bd51252c8184148a78e7e4b44dc2c;
+ERC20CoinInterface ALISTokenInterface = AltCoinInterface(ALISTokenAddress);
+ERC20CoinInterface ARUKTokenInterface = AltCoinInterface(ARUKTokenAddress);
 
 function setRateOfReduction(uint newRateOfReduction) public Ownable() {
   rateOfReduction = newRateOfReduction;
@@ -41,11 +52,10 @@ function setFee(uint newFee) public Ownable(){
   Fee = newFee;
 }
 function addSeller(string calldata name) external dupCheck(msg.sender){
-  
   sellers.push(seller(name,msg.sender,0,0,0));
 }
   function addItem(string calldata _productName, uint _price, uint _stock) external exiCheck(msg.sender){
-    uint productId = products.push(product(_productName,_stock,_price,0)) - 1; //乱数の精製方法を変えるかも
+    uint productId = products.push(product(_productName,_stock,_price,0)) - 1;
     for(uint i=0; i<sellers.length; i++){ //プロダクトとセラーの結びつけをしている
      if(sellers[i].sellerAddress == msg.sender){
         productToSeller[productId] = i;
