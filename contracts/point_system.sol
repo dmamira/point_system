@@ -9,12 +9,15 @@ contract ERC20CoinInterface{
 }
 
 contract point_system {
-
 struct product{
   string name;
   uint stock;
-  uint price;
   uint items;
+  mapping(uint=>uint) NowPrice;
+  address highestBidder;
+  uint64 biddingPeriod;   //Seconds
+  uint finalPrice;
+  uint Token;
 }
 struct seller{
   string name;
@@ -35,8 +38,8 @@ mapping(address=>buyer) addressToBuyerInformation;
 address[] public PermissionPersonList;
 product[] public products;
 seller[] public sellers;
-uint rateOfReduction = 10;
-uint Fee = 1;
+uint rateOfReduction = 4;
+uint Fee = 2;
 address ALISTokenAddress = 0xea610b1153477720748dc13ed378003941d84fab;
 address ARUKTokenAddress = 0x81aada684f4bd51252c8184148a78e7e4b44dc2c;
 ERC20CoinInterface ALISTokenInterface = AltCoinInterface(ALISTokenAddress);
@@ -51,18 +54,36 @@ function AddPermissionAddress(address pemissionPerson) public Ownable(){
 function setFee(uint newFee) public Ownable(){
   Fee = newFee;
 }
-function addSeller(string calldata name) external dupCheck(msg.sender){
+function addSeller(string calldata name) external dupCheck(msg.sender) p(msg.sender){
   sellers.push(seller(name,msg.sender,0,0,0));
 }
-  function addItem(string calldata _productName, uint _price, uint _stock) external exiCheck(msg.sender){
+  function addItem(string calldata _productName,uint _stock,uint[] StartPrice,uint[] TypeOfCurrency,uint period) external exiCheck(msg.sender){
     uint productId = products.push(product(_productName,_stock,_price,0)) - 1;
+    products[_productId].biddingPeriod = now + period;
+    for(uint i=0; i<TypeOfCurrency.length; i++){
+      products[_productId].NowPrice[TypeOfCurrency[i]] = StartPrice[i];   //通貨ごとにオークション開始値段を分けている
+    }
     for(uint i=0; i<sellers.length; i++){ //プロダクトとセラーの結びつけをしている
      if(sellers[i].sellerAddress == msg.sender){
         productToSeller[productId] = i;
       }
     }
   }
-  function AddToCart(uint _productId,uint _items) external enoughStock(_productId,_items){
+
+  function bidding(uint _productId,uint _biddingPrice,uint _items, uint TypeOfCurrency) external enoughtStock(_productId,_items){
+    require(_biddingPrice>products[_productId].NowPrice[TypeOfCurrency] && products[_productId].biddingPeriod>=now);
+    products[_productId].NowPrice[TypeOfCurrency] = _biddingPrice;
+    products[_productId].highestBidder = msg.sender;
+  }
+  function ViewNowPrice(uint _productId,uint TypeOfCurrency) external view returns(uint){
+    return products[_productId].NowPrice[TypeOfCurrency];
+  }
+  function chooseCurrency(uint _productId,uint TypeOfCurrency) public{
+    require(productToSeller[_productId].sellerAddress == msg.sender && now>=products[_productId].biddingPeriod);
+    products[_productId].finalPrice = products[_productId].NowPrice[TypeOfCurrency];
+    products[_productId].Token = TypeOfCurrency;
+  }
+  /*function AddToCart(uint _productId,uint _items) external enoughStock(_productId,_items){
     addressToBuyerInformation[msg.sender].cart_contents.push(_productId);
     addressToBuyerInformation[msg.sender].items.push(_items);
     addressToBuyerInformation[msg.sender].cart_price += products[_productId].price* _items;
@@ -74,7 +95,7 @@ function addSeller(string calldata name) external dupCheck(msg.sender){
         show[i] = (products[addressToBuyerInformation[msg.sender].cart_contents[i]].name);
       }
       return show;
-  }
+  }*/
   function acceptPayment() external payable returns(bool){
     uint cart_price = addressToBuyerInformation[msg.sender].cart_price;
     require(cart_price<=msg.value);
