@@ -18,6 +18,7 @@ struct product{
   uint64 biddingPeriod;   //Seconds
   uint finalPrice;
   uint Token;
+  bool PaymentStatus;
 }
 struct seller{
   string name;
@@ -42,8 +43,8 @@ uint rateOfReduction = 4;
 uint Fee = 2;
 address ALISTokenAddress = 0xea610b1153477720748dc13ed378003941d84fab;
 address ARUKTokenAddress = 0x81aada684f4bd51252c8184148a78e7e4b44dc2c;
-ERC20CoinInterface ALISTokenInterface = AltCoinInterface(ALISTokenAddress);
-ERC20CoinInterface ARUKTokenInterface = AltCoinInterface(ARUKTokenAddress);
+ERC20CoinInterface ALISTokenInterface = ERC20CoinInterface(ALISTokenAddress);
+ERC20CoinInterface ARUKTokenInterface = ERC20CoinInterface(ARUKTokenAddress);
 
 function setRateOfReduction(uint newRateOfReduction) public Ownable() {
   rateOfReduction = newRateOfReduction;
@@ -83,29 +84,25 @@ function addSeller(string calldata name) external dupCheck(msg.sender) p(msg.sen
     products[_productId].finalPrice = products[_productId].NowPrice[TypeOfCurrency];
     products[_productId].Token = TypeOfCurrency;
   }
-  /*function AddToCart(uint _productId,uint _items) external enoughStock(_productId,_items){
-    addressToBuyerInformation[msg.sender].cart_contents.push(_productId);
-    addressToBuyerInformation[msg.sender].items.push(_items);
-    addressToBuyerInformation[msg.sender].cart_price += products[_productId].price* _items;
-  }
-  function cartView() external view returns(string[] memory){
-      uint length = addressToBuyerInformation[msg.sender].cart_contents.length;
-      string[] memory show = new string[](length);
-      for(uint i=0; i<length; i++){
-        show[i] = (products[addressToBuyerInformation[msg.sender].cart_contents[i]].name);
-      }
-      return show;
-  }*/
-  function acceptPayment() external payable returns(bool){
-    uint cart_price = addressToBuyerInformation[msg.sender].cart_price;
-    require(cart_price<=msg.value);
-    sub(msg.sender);
-    addPoint(cart_price,msg.sender);
-    addressToBuyerInformation[msg.sender].cart_price = 0;
-    for(uint i=0; i<addressToBuyerInformation[msg.sender].cart_contents.length; i++){ 
-      addressToBuyerInformation[msg.sender].cart_contents[i] = addressToBuyerInformation[msg.sender].inProcessing[i];
-      delete addressToBuyerInformation[msg.sender].cart_contents[i];
+  function acceptPayment(uint _productId) external payable returns(bool){
+    uint PaymentAmount = products[_productId].finalPrice;
+    if(products[_productId].token == 1){
+      ALISTokenInterface.approve(address(this),PaymentAmount);
+      require(PaymentAmount<=ALISTokenInterface.allowance(msg.sender,address(this)));
     }
+   else if(products[_productId].token == 2){
+    ARUKTokenInterface.approve(address(this),PaymentAmount);
+    require(PaymentAmount<=ARUKTokenInterface.allowance(msg.sender,address(this)));
+   }
+    if(products[_productId].token == 1){
+      ALISTokenInterface.transferFrom(msg.sender,address(this),PaymentAmount);
+    }
+    else if(products[_productId].token == 2){
+      ARUKTokenInterface.transferFrom(msg.sender,address(this),PaymentAmount);
+    }
+    sub(_productId);
+    addPoint(PaymentAmount,msg.sender);
+    products[_productId].PaymentStatus = true;
     return true;
   }
   function getCartPrice() public view returns(uint){
@@ -120,10 +117,8 @@ function addSeller(string calldata name) external dupCheck(msg.sender) p(msg.sen
      }
     }
    }
-  function sub(address buyerAddress) private{
-    for(uint i=0; i<addressToBuyerInformation[buyerAddress].cart_contents.length; i++){ 
-      products[addressToBuyerInformation[buyerAddress].cart_contents[i]].stock -= addressToBuyerInformation[buyerAddress].items[i];
-    }
+  function sub(uint _productId) private{
+    products[_productId].stock -=;
   }
   function addPoint(uint _totalValue, address _buyer_address) private{
     addressToBuyerInformation[_buyer_address].point += _totalValue*rateOfReduction;
