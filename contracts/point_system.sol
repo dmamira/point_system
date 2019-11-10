@@ -9,13 +9,14 @@ contract ERC20CoinInterface{
 }
 
 contract point_system {
+  
 struct product{
   string name;
-  uint stock;
-  uint items;
+  uint stock;  //基本オークションは一個のみなので在庫も必要なし
+  uint items;   //items必要なし
   mapping(uint=>uint) NowPrice;
-  address highestBidder;
-  uint64 biddingPeriod;   //Seconds
+  address[] highestBidder;  //通貨ごとの最高入札者が必要
+  uint biddingPeriod;   //Seconds
   uint finalPrice;
   uint Token;
   bool PaymentStatus;
@@ -27,13 +28,7 @@ struct seller{
   uint bad;
   uint processed;
 }
-struct buyer{
-  uint point;
-  uint cart_price;
-  uint[] cart_contents;
-  uint[] inProcessing;
-  uint[] items;
-}
+mapping(address=>uint) addressToPoint;
 mapping(uint=>uint) productToSeller;
 mapping(address=>buyer) addressToBuyerInformation;
 address[] public PermissionPersonList;
@@ -84,30 +79,6 @@ function addSeller(string calldata name) external dupCheck(msg.sender) p(msg.sen
     products[_productId].finalPrice = products[_productId].NowPrice[TypeOfCurrency];
     products[_productId].Token = TypeOfCurrency;
   }
-  function acceptPayment(uint _productId) external payable returns(bool){
-    uint PaymentAmount = products[_productId].finalPrice;
-    if(products[_productId].token == 1){
-      ALISTokenInterface.approve(address(this),PaymentAmount);
-      require(PaymentAmount<=ALISTokenInterface.allowance(msg.sender,address(this)));
-    }
-   else if(products[_productId].token == 2){
-    ARUKTokenInterface.approve(address(this),PaymentAmount);
-    require(PaymentAmount<=ARUKTokenInterface.allowance(msg.sender,address(this)));
-   }
-    if(products[_productId].token == 1){
-      ALISTokenInterface.transferFrom(msg.sender,address(this),PaymentAmount);
-    }
-    else if(products[_productId].token == 2){
-      ARUKTokenInterface.transferFrom(msg.sender,address(this),PaymentAmount);
-    }
-    sub(_productId);
-    addPoint(PaymentAmount,msg.sender);
-    products[_productId].PaymentStatus = true;
-    return true;
-  }
-  function getCartPrice() public view returns(uint){
-      return addressToBuyerInformation[msg.sender].cart_price;
-  }
   function addProcessed(address buyer_address) private returns(uint){
      for(uint m=0; m<addressToBuyerInformation[buyer_address].cart_contents.length; m++){ 
       for(uint i=0; i<products.length; i++){ 
@@ -118,7 +89,7 @@ function addSeller(string calldata name) external dupCheck(msg.sender) p(msg.sen
     }
    }
   function sub(uint _productId) private{
-    products[_productId].stock -=;
+    //products[_productId].stock -=;
   }
   function addPoint(uint _totalValue, address _buyer_address) private{
     addressToBuyerInformation[_buyer_address].point += _totalValue*rateOfReduction;
@@ -166,3 +137,6 @@ modifier exiCheck(address seller2){
    _;
  }
 }
+
+//商品に対するいいねを押すことでトークンをゲットできる　出品でトークンをゲットできる　購入ではポイントのようにトークンをゲットできる
+//受取相手の評価をすることでトークンをゲットできるなど、トークンエコノミーと結び付けられるかも？
