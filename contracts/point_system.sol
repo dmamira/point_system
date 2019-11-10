@@ -1,21 +1,19 @@
-pragma solidity ^0.5.0;
-pragma experimental ABIEncoderV2;
-import "/home/miraidai/point_system/node_modules/zeppelin-solidity/contracts/ownership/Ownable.sol";
+pragma solidity ^0.4.24;
 
+pragma experimental ABIEncoderV2;
+import "./Ownable.sol";
 contract ERC20CoinInterface{
   function transfer(address _to, uint256 _value) public returns (bool);
   function approve(address spender, uint tokens) public returns (bool success);
   function transferFrom(address from, address to, uint tokens) public returns (bool success);
 }
 
-contract point_system {
+contract point_system is Ownable {
   
 struct product{
   string name;
-  uint stock;  //基本オークションは一個のみなので在庫も必要なし
-  uint items;   //items必要なし
   mapping(uint=>uint) NowPrice;
-  address[] highestBidder;  //通貨ごとの最高入札者が必要
+  address[] highestBidder; 
   uint biddingPeriod;   //Seconds
   uint finalPrice;
   uint Token;
@@ -23,86 +21,60 @@ struct product{
 }
 struct seller{
   string name;
-  address payable sellerAddress;
+  address sellerAddress;
   uint good;
   uint bad;
   uint processed;
 }
 mapping(address=>uint) addressToPoint;
 mapping(uint=>uint) productToSeller;
-mapping(address=>buyer) addressToBuyerInformation;
 address[] public PermissionPersonList;
 product[] public products;
 seller[] public sellers;
-uint rateOfReduction = 4;
-uint Fee = 2;
-address ALISTokenAddress = 0xea610b1153477720748dc13ed378003941d84fab;
-address ARUKTokenAddress = 0x81aada684f4bd51252c8184148a78e7e4b44dc2c;
+address ALISTokenAddress = 0xEA610B1153477720748DC13ED378003941d84fAB;
+address ARUKTokenAddress = 0x81AADA684F4Bd51252c8184148A78e7E4B44dc2c;
+address satelliteAddress; 
 ERC20CoinInterface ALISTokenInterface = ERC20CoinInterface(ALISTokenAddress);
 ERC20CoinInterface ARUKTokenInterface = ERC20CoinInterface(ARUKTokenAddress);
 
-function setRateOfReduction(uint newRateOfReduction) public Ownable() {
-  rateOfReduction = newRateOfReduction;
+function AddPermissionAddress(address _permissionPerson) public onlyOwner(){
+  PermissionPersonList.push(_permissionPerson);
 }
-function AddPermissionAddress(address pemissionPerson) public Ownable(){
-  PermissionPersonList.push(permissionPerson);
+
+function addSeller(string _name) external dupCheck(msg.sender) PermissionCheck(msg.sender){
+  sellers.push(seller(_name,msg.sender,0,0,0));
 }
-function setFee(uint newFee) public Ownable(){
-  Fee = newFee;
-}
-function addSeller(string calldata name) external dupCheck(msg.sender) p(msg.sender){
-  sellers.push(seller(name,msg.sender,0,0,0));
-}
-  function addItem(string calldata _productName,uint _stock,uint[] StartPrice,uint[] TypeOfCurrency,uint period) external exiCheck(msg.sender){
-    uint productId = products.push(product(_productName,_stock,_price,0)) - 1;
-    products[_productId].biddingPeriod = now + period;
+  function addItem(string _productName,uint[] _StartPrice,uint[] TypeOfCurrency,uint period) external exiCheck(msg.sender){
+    address[] memory a;
+    uint productId = products.push(product(_productName,a,0,0,0,false)) - 1;
+    products[productId].biddingPeriod = now + period;
     for(uint i=0; i<TypeOfCurrency.length; i++){
-      products[_productId].NowPrice[TypeOfCurrency[i]] = StartPrice[i];   //通貨ごとにオークション開始値段を分けている
+      products[productId].NowPrice[TypeOfCurrency[i]] = _StartPrice[i];   //通貨ごとにオークション開始値段を分けている
     }
+    ConnectingSellerWithProduct(productId,msg.sender);
+  }
+  function ConnectingSellerWithProduct(uint _productId,address _sender) private{
     for(uint i=0; i<sellers.length; i++){ //プロダクトとセラーの結びつけをしている
-     if(sellers[i].sellerAddress == msg.sender){
-        productToSeller[productId] = i;
+     if(sellers[i].sellerAddress == _sender){
+        productToSeller[_productId] = i;
       }
     }
   }
-
-  function bidding(uint _productId,uint _biddingPrice,uint _items, uint TypeOfCurrency) external enoughtStock(_productId,_items){
+  function bidding(uint _productId,uint _biddingPrice, uint TypeOfCurrency) external{
     require(_biddingPrice>products[_productId].NowPrice[TypeOfCurrency] && products[_productId].biddingPeriod>=now);
     products[_productId].NowPrice[TypeOfCurrency] = _biddingPrice;
-    products[_productId].highestBidder = msg.sender;
+    products[_productId].highestBidder[TypeOfCurrency] = msg.sender;
   }
   function ViewNowPrice(uint _productId,uint TypeOfCurrency) external view returns(uint){
     return products[_productId].NowPrice[TypeOfCurrency];
   }
-  function chooseCurrency(uint _productId,uint TypeOfCurrency) public{
-    require(productToSeller[_productId].sellerAddress == msg.sender && now>=products[_productId].biddingPeriod);
+  function ViewHightestBidder(uint _productId,uint _TypeOfCurrency) external view returns(address){
+    return products[_productId].highestBidder[_TypeOfCurrency];
+  }
+  function chooseCurrency(uint _productId,uint TypeOfCurrency) external{
+    require(sellers[productToSeller[_productId]].sellerAddress == msg.sender && now>=products[_productId].biddingPeriod);
     products[_productId].finalPrice = products[_productId].NowPrice[TypeOfCurrency];
     products[_productId].Token = TypeOfCurrency;
-  }
-  function addProcessed(address buyer_address) private returns(uint){
-     for(uint m=0; m<addressToBuyerInformation[buyer_address].cart_contents.length; m++){ 
-      for(uint i=0; i<products.length; i++){ 
-        if(i == addressToBuyerInformation[buyer_address].cart_contents[m]){
-        sellers[productToSeller[i]].processed += addressToBuyerInformation[buyer_address].items[m] * products[i].price;
-      }
-     }
-    }
-   }
-  function sub(uint _productId) private{
-    //products[_productId].stock -=;
-  }
-  function addPoint(uint _totalValue, address _buyer_address) private{
-    addressToBuyerInformation[_buyer_address].point += _totalValue*rateOfReduction;
-  }
-  function usepoint(uint _amount) external{
-    require(addressToBuyerInformation[msg.sender].point>=_amount);
-    addressToBuyerInformation[msg.sender].cart_price -= _amount;
-    addressToBuyerInformation[msg.sender].point -= _amount;
-  }
-
-  modifier enoughStock(uint _productId,uint _items){
-    require(products[_productId].stock>=_items);
-    _;
   }
   modifier dupCheck(address seller1){
     int check = -5;
@@ -126,7 +98,7 @@ modifier exiCheck(address seller2){
     _;
   }
  modifier PermissionCheck(address person){
-   uint check = false;
+   bool check = false;
    for(uint i = 0; i<PermissionPersonList.length; i++ ){
      if(PermissionPersonList[i] == person){
        check = true;

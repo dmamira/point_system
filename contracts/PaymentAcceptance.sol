@@ -15,6 +15,7 @@ contract PaymentAcceptance{
     ERC20CoinInterface ARUKTokenInterface = ERC20CoinInterface(ARUKTokenAddress);
     
     function acceptPayment(uint _productId) external payable returns(bool){
+      
     uint PaymentAmount = products[_productId].finalPrice;
     if(products[_productId].token == 1){
       ALISTokenInterface.approve(address(this),PaymentAmount);
