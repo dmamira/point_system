@@ -2,11 +2,6 @@ pragma solidity ^0.4.24;
 
 pragma experimental ABIEncoderV2;
 import "./Ownable.sol";
-contract ERC20CoinInterface{
-  function transfer(address _to, uint256 _value) public returns (bool);
-  function approve(address spender, uint tokens) public returns (bool success);
-  function transferFrom(address from, address to, uint tokens) public returns (bool success);
-}
 
 contract point_system is Ownable {
   
@@ -31,11 +26,6 @@ mapping(uint=>uint) productToSeller;
 address[] public PermissionPersonList;
 product[] public products;
 seller[] public sellers;
-address ALISTokenAddress = 0xEA610B1153477720748DC13ED378003941d84fAB;
-address ARUKTokenAddress = 0x81AADA684F4Bd51252c8184148A78e7E4B44dc2c;
-address satelliteAddress; 
-ERC20CoinInterface ALISTokenInterface = ERC20CoinInterface(ALISTokenAddress);
-ERC20CoinInterface ARUKTokenInterface = ERC20CoinInterface(ARUKTokenAddress);
 
 function AddPermissionAddress(address _permissionPerson) public onlyOwner(){
   PermissionPersonList.push(_permissionPerson);
@@ -48,10 +38,13 @@ function addSeller(string _name) external dupCheck(msg.sender) PermissionCheck(m
     address[] memory a;
     uint productId = products.push(product(_productName,a,0,0,0,false)) - 1;
     products[productId].biddingPeriod = now + period;
-    for(uint i=0; i<TypeOfCurrency.length; i++){
-      products[productId].NowPrice[TypeOfCurrency[i]] = _StartPrice[i];   //通貨ごとにオークション開始値段を分けている
-    }
     ConnectingSellerWithProduct(productId,msg.sender);
+    setStartPrice(productId,_StartPrice,TypeOfCurrency);
+  }
+  function setStartPrice(uint _productId,uint[] _StartPrice,uint[] TypeOfCurrency) private{
+      for(uint i=0; i<TypeOfCurrency.length; i++){
+      products[_productId].NowPrice[TypeOfCurrency[i]] = _StartPrice[i];   //通貨ごとにオークション開始値段を分けている
+    }
   }
   function ConnectingSellerWithProduct(uint _productId,address _sender) private{
     for(uint i=0; i<sellers.length; i++){ //プロダクトとセラーの結びつけをしている
