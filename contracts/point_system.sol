@@ -8,7 +8,7 @@ contract point_system is Ownable {
 struct product{
   string name;
   mapping(uint=>uint) NowPrice;
-  address[] highestBidder; 
+  mapping(uint=>address) highestBidder;
   uint biddingPeriod;   //Seconds
   uint finalPrice;
   uint Token;
@@ -35,8 +35,7 @@ function addSeller(string _name) external dupCheck(msg.sender) PermissionCheck(m
   sellers.push(seller(_name,msg.sender,0,0,0));
 }
   function addItem(string _productName,uint[] _StartPrice,uint[] TypeOfCurrency,uint period) external exiCheck(msg.sender){
-    address[] memory a;
-    uint productId = products.push(product(_productName,a,0,0,0,false)) - 1;
+    uint productId = products.push(product(_productName,0,0,0,false)) - 1;
     products[productId].biddingPeriod = now + period;
     ConnectingSellerWithProduct(productId,msg.sender);
     setStartPrice(productId,_StartPrice,TypeOfCurrency);
@@ -54,15 +53,18 @@ function addSeller(string _name) external dupCheck(msg.sender) PermissionCheck(m
     }
   }
   function bidding(uint _productId,uint _biddingPrice, uint TypeOfCurrency) external{
-    require(_biddingPrice>products[_productId].NowPrice[TypeOfCurrency] && products[_productId].biddingPeriod>=now);
+    require(_biddingPrice>products[_productId].NowPrice[TypeOfCurrency] && products[_productId].biddingPeriod>=block.timestamp);
     products[_productId].NowPrice[TypeOfCurrency] = _biddingPrice;
     products[_productId].highestBidder[TypeOfCurrency] = msg.sender;
   }
-  function ViewNowPrice(uint _productId,uint TypeOfCurrency) external view returns(uint){
+  function GetNowPrice(uint _productId,uint TypeOfCurrency) external view returns(uint){
     return products[_productId].NowPrice[TypeOfCurrency];
   }
-  function ViewHightestBidder(uint _productId,uint _TypeOfCurrency) external view returns(address){
+  function GetHightestBidder(uint _productId,uint _TypeOfCurrency) external view returns(address){
     return products[_productId].highestBidder[_TypeOfCurrency];
+  }
+  function GetBiddingPeriod(uint _productId) external view returns(uint,uint){
+      return(now,products[_productId].biddingPeriod);
   }
   function chooseCurrency(uint _productId,uint TypeOfCurrency) external{
     require(sellers[productToSeller[_productId]].sellerAddress == msg.sender && now>=products[_productId].biddingPeriod);
