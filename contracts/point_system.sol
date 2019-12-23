@@ -1,121 +1,77 @@
-pragma solidity ^0.5.0;
-pragma experimental ABIEncoderV2;
-import "/home/miraidai/point_system/node_modules/zeppelin-solidity/contracts/ownership/Ownable.sol";
+pragma solidity ^0.5.11;
 
-contract ERC20CoinInterface{
-  function transfer(address _to, uint256 _value) public returns (bool);
-  function approve(address spender, uint tokens) public returns (bool success);
-  function transferFrom(address from, address to, uint tokens) public returns (bool success);
+pragma experimental ABIEncoderV2;
+import "./Ownable.sol";
+
+contract PaymentAcceptance{
+     function acceptPaymentForAltCoin(uint _finalPrice,address _sender,uint _token) external payable returns(bool);
+     function ConfirmOfReceipt(uint _finalPrice,address _sellersAddress,uint _Token,uint evaluation) public;
 }
 
-contract point_system {
-
+contract point_system is Ownable {
+    address PaymentAcceptanceAddress = 0x8046085fb6806cAa9b19a4Cd7b3cd96374dD9573;
+    PaymentAcceptance PaymentAcceptance1 = PaymentAcceptance(PaymentAcceptanceAddress);
 struct product{
   string name;
-  uint stock;
-  uint price;
-  uint items;
+  mapping(uint=>uint) TokenToPrice;
+  bool PaymentStatus;
+  address Buyer;
+  uint FinalToken;
 }
 struct seller{
   string name;
-  address payable sellerAddress;
+  address sellerAddress;
   uint good;
   uint bad;
-  uint processed;
 }
-struct buyer{
-  uint point;
-  uint cart_price;
-  uint[] cart_contents;
-  uint[] inProcessing;
-  uint[] items;
-}
+mapping(address=>uint) addressToPoint;
 mapping(uint=>uint) productToSeller;
-mapping(address=>buyer) addressToBuyerInformation;
-address[] public PermissionPersonList;
 product[] public products;
 seller[] public sellers;
-uint rateOfReduction = 10;
-uint Fee = 1;
-address ALISTokenAddress = 0xea610b1153477720748dc13ed378003941d84fab;
-address ARUKTokenAddress = 0x81aada684f4bd51252c8184148a78e7e4b44dc2c;
-ERC20CoinInterface ALISTokenInterface = AltCoinInterface(ALISTokenAddress);
-ERC20CoinInterface ARUKTokenInterface = AltCoinInterface(ARUKTokenAddress);
 
-function setRateOfReduction(uint newRateOfReduction) public Ownable() {
-  rateOfReduction = newRateOfReduction;
+function setPaymentAcceptanceAddress(address _new) public onlyOwner(){
+    PaymentAcceptanceAddress = _new;
 }
-function AddPermissionAddress(address pemissionPerson) public Ownable(){
-  PermissionPersonList.push(permissionPerson);
+function addSeller(string _name) external dupCheck(msg.sender) {
+  sellers.push(seller(_name,msg.sender,0,0));
 }
-function setFee(uint newFee) public Ownable(){
-  Fee = newFee;
-}
-function addSeller(string calldata name) external dupCheck(msg.sender){
-  sellers.push(seller(name,msg.sender,0,0,0));
-}
-  function addItem(string calldata _productName, uint _price, uint _stock) external exiCheck(msg.sender){
-    uint productId = products.push(product(_productName,_stock,_price,0)) - 1;
+  function addItem(string _productName) external exiCheck(msg.sender){
+    uint productId = products.push(product(_productName,false)) - 1;
+    ConnectingSellerWithProduct(productId,msg.sender);
+  }
+  function ConnectingSellerWithProduct(uint _productId,address _sender) private{
     for(uint i=0; i<sellers.length; i++){ //プロダクトとセラーの結びつけをしている
-     if(sellers[i].sellerAddress == msg.sender){
-        productToSeller[productId] = i;
+     if(sellers[i].sellerAddress == _sender){
+        productToSeller[_productId] = i;
       }
     }
   }
-  function AddToCart(uint _productId,uint _items) external enoughStock(_productId,_items){
-    addressToBuyerInformation[msg.sender].cart_contents.push(_productId);
-    addressToBuyerInformation[msg.sender].items.push(_items);
-    addressToBuyerInformation[msg.sender].cart_price += products[_productId].price* _items;
+  function Buying(uint _productId,uint _token) public{
+    if(_token != 2){
+    products[_productId].PaymentStatus = acceptPaymentForAltCoin(products[_productId].TokenToPrice[_token],msg.sender,_token);
+    products[_productId].finalToken = _token;
+    if(products[_productId].Status == true){
+      products[_productId.Buyer] = msg.sender;
+    }
   }
-  function cartView() external view returns(string[] memory){
-      uint length = addressToBuyerInformation[msg.sender].cart_contents.length;
-      string[] memory show = new string[](length);
-      for(uint i=0; i<length; i++){
-        show[i] = (products[addressToBuyerInformation[msg.sender].cart_contents[i]].name);
+    else{
+      products[_productId].PaymentStatus = acceptPaymentForETH(products[_productId].TokenToPrice[_token],msg.sender,_token);
+      products[_productId].finalToken = _token;
+      if(products[_productId].Status == true){
+      products[_productId.Buyer] = msg.sender;
+    }
+    }
+  }
+  function ConfirmOfReceipit(uint _productId,uint _evaluation) external{
+      require(products[_productId].Buyer == msg.sender && products[_productId].PaymentStatus == true);
+      uint finalprice = products[_productId].finalToken;
+      address sellerAddress = sellers[productToSeller[_productid]].sellerAddress;
+      if(_evaluation == 1){
+          sellers[productToSeller[_productId]].good++;
+      }else if(_evaluation == 2){
+          sellers[productToSeller[_productId]].bad++;
       }
-      return show;
-  }
-  function acceptPayment() external payable returns(bool){
-    uint cart_price = addressToBuyerInformation[msg.sender].cart_price;
-    require(cart_price<=msg.value);
-    sub(msg.sender);
-    addPoint(cart_price,msg.sender);
-    addressToBuyerInformation[msg.sender].cart_price = 0;
-    for(uint i=0; i<addressToBuyerInformation[msg.sender].cart_contents.length; i++){ 
-      addressToBuyerInformation[msg.sender].cart_contents[i] = addressToBuyerInformation[msg.sender].inProcessing[i];
-      delete addressToBuyerInformation[msg.sender].cart_contents[i];
-    }
-    return true;
-  }
-  function getCartPrice() public view returns(uint){
-      return addressToBuyerInformation[msg.sender].cart_price;
-  }
-  function addProcessed(address buyer_address) private returns(uint){
-     for(uint m=0; m<addressToBuyerInformation[buyer_address].cart_contents.length; m++){ 
-      for(uint i=0; i<products.length; i++){ 
-        if(i == addressToBuyerInformation[buyer_address].cart_contents[m]){
-        sellers[productToSeller[i]].processed += addressToBuyerInformation[buyer_address].items[m] * products[i].price;
-      }
-     }
-    }
-   }
-  function sub(address buyerAddress) private{
-    for(uint i=0; i<addressToBuyerInformation[buyerAddress].cart_contents.length; i++){ 
-      products[addressToBuyerInformation[buyerAddress].cart_contents[i]].stock -= addressToBuyerInformation[buyerAddress].items[i];
-    }
-  }
-  function addPoint(uint _totalValue, address _buyer_address) private{
-    addressToBuyerInformation[_buyer_address].point += _totalValue*rateOfReduction;
-  }
-  function usepoint(uint _amount) external{
-    require(addressToBuyerInformation[msg.sender].point>=_amount);
-    addressToBuyerInformation[msg.sender].cart_price -= _amount;
-    addressToBuyerInformation[msg.sender].point -= _amount;
-  }
-
-  modifier enoughStock(uint _productId,uint _items){
-    require(products[_productId].stock>=_items);
-    _;
+      PaymentAcceptance.ConfirmOfReceipt(finalprice,finalToken,sellerAddress);
   }
   modifier dupCheck(address seller1){
     int check = -5;
@@ -138,15 +94,6 @@ modifier exiCheck(address seller2){
     require(check2!=-1);
     _;
   }
- modifier PermissionCheck(address person){
-   uint check = false;
-   for(uint i = 0; i<PermissionPersonList.length; i++ ){
-     if(PermissionPersonList[i] == person){
-       check = true;
-       break;
-     }
-   }
-   require(check==true,"You aren't in the permission list ");
-   _;
- }
 }
+//商品に対するいいねを押すことでトークンをゲットできる　出品でトークンをゲットできる　購入ではポイントのようにトークンをゲットできる
+//受取相手の評価をすることでトークンをゲットできるなど、トークンエコノミーと結び付けられるかも？
