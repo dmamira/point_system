@@ -2,16 +2,13 @@ pragma solidity ^0.5.15;
 
 pragma experimental ABIEncoderV2;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/ownership/Ownable.sol";
-import "./PaymentAcceptance.sol";
-
 contract PaymentAcceptance{
      function ConfirmOfReceipt(uint _finalPrice,uint _Token,address _sellersAddress) public;
      function acceptPaymentForAltCoin(uint _price,address _sender,uint _token) external payable returns(bool);
-     function AcceptPaymentForETH(uint _price, address _sender) public payable returns(bool);
 }
 
 contract point_system3 is Ownable {
-    address payable PaymentAcceptanceAddress = 0x15e08fa9FE3e3aa3607AC57A29f92b5D8Cb154A2;
+    address PaymentAcceptanceAddress = 0x375EaE23b65fEB1833072328647902f1FE9afA61;
     PaymentAcceptance PaymentAcceptance1 = PaymentAcceptance(PaymentAcceptanceAddress);
 struct product{
   string name;
@@ -22,7 +19,7 @@ struct product{
 }
 struct seller{
   string name;
-  address sellerAddress;
+  address payable sellerAddress;
   uint good;
   uint bad;
 }
@@ -31,8 +28,9 @@ mapping(uint=>uint) productToSeller;
 product[] public products;
 seller[] public sellers;
 
-function setPaymentAcceptanceAddress(address payable _new) public onlyOwner(){
+function setPaymentAcceptanceAddress(address _new) public onlyOwner(){
     PaymentAcceptanceAddress = _new;
+    PaymentAcceptance1 = PaymentAcceptance(PaymentAcceptanceAddress);
 }
 function addSeller(string calldata _name) external dupCheck(msg.sender) {
   sellers.push(seller(_name,msg.sender,0,0));
@@ -55,7 +53,8 @@ function addSeller(string calldata _name) external dupCheck(msg.sender) {
       uint returnPrice = products[_productId].TokenToPrice[_tokenId];
       return returnPrice;
   }
-  function Buying(uint _productId,uint _token) public payable{
+  function Buying(uint _productId,uint _token) public payable returns(bool){
+    require(products[_productId].PaymentStatus != true,"It was already bought by someone");
     if(_token != 2){
     products[_productId].PaymentStatus = PaymentAcceptance1.acceptPaymentForAltCoin(products[_productId].TokenToPrice[_token],msg.sender,_token);
     products[_productId].FinalToken = _token;
@@ -64,10 +63,20 @@ function addSeller(string calldata _name) external dupCheck(msg.sender) {
     }
   }
     else{
-    require(msg.value>=products[_productId].TokenToPrice[2]*(10**15));
+    require(msg.value>=products[_productId].TokenToPrice[2]*(10**15),"not enough");
+    products[_productId].Buyer = msg.sender;
     products[_productId].PaymentStatus = true;
-    PaymentAcceptanceAddress.transfer(msg.value);
+    products[_productId].FinalToken = _token;
+    return true;
   }
+}
+function TransferETH(uint _productId) private{
+    uint amount = products[_productId].TokenToPrice[2];
+    address payable sellerAddress = sellers[productToSeller[_productId]].sellerAddress;
+    sellerAddress.transfer(amount*(10**15));
+}
+function getPaymentAcceptanceAddress() public view returns(address){
+    return PaymentAcceptanceAddress;
 }
   function ConfirmOfReceipt(uint _productId,uint _evaluation) external{
       require(products[_productId].Buyer == msg.sender && products[_productId].PaymentStatus == true);
@@ -79,7 +88,12 @@ function addSeller(string calldata _name) external dupCheck(msg.sender) {
       }else if(_evaluation == 2){
           sellers[productToSeller[_productId]].bad++;
       }
+      if(finaltoken == 2){
+          TransferETH(_productId);
+      }
+      else{
       PaymentAcceptance1.ConfirmOfReceipt(finalprice,finaltoken,sellerAddress);
+      }
   }
   modifier dupCheck(address seller1){
     int check = -5;
