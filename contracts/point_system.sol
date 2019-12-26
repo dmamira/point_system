@@ -1,4 +1,3 @@
-```solidity
 pragma solidity ^0.5.15;
 
 pragma experimental ABIEncoderV2;
@@ -17,6 +16,7 @@ struct product{
   bool PaymentStatus;
   address Buyer;
   uint FinalToken;
+  bool FinishedStatus;
 }
 struct seller{
   string name;
@@ -37,7 +37,7 @@ function addSeller(string calldata _name) external dupCheck(msg.sender) {
   sellers.push(seller(_name,msg.sender,0,0));
 }
   function addItem(string calldata _productName,uint[] calldata _price,uint[] calldata _token) external exiCheck(msg.sender){
-    uint productId = products.push(product(_productName,false,0x0000000000000000000000000000000000000000,0)) - 1;
+    uint productId = products.push(product(_productName,false,0x0000000000000000000000000000000000000000,0,false)) - 1;
     for(uint i = 0; i<_token.length; i++){
         products[productId].TokenToPrice[_token[i]] = _price[i];
     }
@@ -80,7 +80,7 @@ function getPaymentAcceptanceAddress() public view returns(address){
     return PaymentAcceptanceAddress;
 }
   function ConfirmOfReceipt(uint _productId,uint _evaluation) external{
-      require(products[_productId].Buyer == msg.sender && products[_productId].PaymentStatus == true);
+      require(products[_productId].Buyer == msg.sender && products[_productId].PaymentStatus == true && products[_productId].FinishedStatus == false);
       uint finalprice = products[_productId].FinalToken;
       uint finaltoken = products[_productId].FinalToken;
       address sellerAddress = sellers[productToSeller[_productId]].sellerAddress;
@@ -91,6 +91,7 @@ function getPaymentAcceptanceAddress() public view returns(address){
       }
       if(finaltoken == 2){
           TransferETH(_productId);
+          products[_productId].FinishedStatus = true;
       }
       else{
       PaymentAcceptance1.ConfirmOfReceipt(finalprice,finaltoken,sellerAddress);
@@ -118,6 +119,5 @@ modifier exiCheck(address seller2){
     _;
   }
 }
-```
 //商品に対するいいねを押すことでトークンをゲットできる　出品でトークンをゲットできる　購入ではポイントのようにトークンをゲットできる
 //受取相手の評価をすることでトークンをゲットできるなど、トークンエコノミーと結び付けられるかも？
